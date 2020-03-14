@@ -1,3 +1,25 @@
+functions {
+  real conv_exp_pdf(int x, real lambda) {
+    real out;
+    out = (lambda / 2) * exp(-lambda * fabs(x));
+    return out;
+  }
+  
+  real w_dist(int x, vector w, int t) {
+    real out;
+    
+    if(x > 0){
+      if(x < (t-1)){
+        out = w[x];
+      }
+    }else{
+      out = 0;
+    }
+    return out;
+  }
+  
+}
+
 data {
   int t; // number of time steps
   int <lower = 0> obs_imported[t]; // imported cases
@@ -37,6 +59,7 @@ model {
   real infectiousness[t]; // infectiousness at each timestep
   real v[t-1]; // convolution of two delay distributions
   real wv[t - 1]; // convolution of w and v
+  vector[t-1] wvec;
 
   ////////////////////////
   // DELAY DISTRIBUTION // 
@@ -50,18 +73,23 @@ model {
   }
   
   // Discretise delay distribution
-  for(i in 1:(t-1)){
-    v[i] =  exponential_cdf(i + 0.5, lambda) - exponential_cdf(i  - 0.5, lambda);
-  }
+  // for(i in 1:(t-1)){
+  //   v[i] =  exponential_cdf(i + 0.5, lambda) - exponential_cdf(i  - 0.5, lambda);
+  //   // v[i] = conv_exp_pdf(i, lambda);
+  // }
   
   // Calculate convolution of double delay and serial interval
-  wv[1] = 0.000001; // fix this?
-  for(s in 2:(t-1)){
-    wv[s] = 0;
-    for(j in 1:(s-1)){
-          wv[s] += w[j]*v[s-j];
+  for(i in 1:(t-1)){
+    wvec[i] = lognormal_cdf(i + 0.5, ln_location, ln_scale) - lognormal_cdf(i  - 0.5, ln_location, ln_scale);
+  }
+  
+  for(i in 1:(t-1)) {
+    wv[i] = 0;
+    for(j in -50:50) {
+      wv[i] +=  w_dist(j, wvec, t) * conv_exp_pdf(i-j, lambda);
     }
   }
+  
   
   /////////////////
   // ESTIMATE R0 //
@@ -89,47 +117,47 @@ model {
 
 // spare code for checking serial interval distribution
 generated quantities {
-  real out[t - 1];
-  real out_v[t - 1];
-  real out_w[t - 1];
-  real out_i[t];
-  real out_wv[t - 1];
-  real out_i2[t];
+  // real out_v[t-1];
+  // real out_w[t-1];
+  // vector[t-1] out_w_vec;
+  // real out_i[t];
+  // real out_wv[t - 1];
+  // real out_i2[t];
 
   // Discretise "double delay" gamma distribution
-  for(i in 1:(t-1)){
-    out_v[i] =  exponential_cdf(i + 0.5, lambda) - exponential_cdf(i  - 0.5, lambda);
-    out_w[i] = lognormal_cdf(i + 0.5, ln_location, ln_scale) - lognormal_cdf(i  - 0.5, ln_location, ln_scale);
-  }
+  // for(i in 1:(t-1)){
+    // out_v[i] =  exponential_cdf(i + 0.5, lambda) - exponential_cdf(i  - 0.5, lambda);
+    // out_v[i] = conv_exp_pdf(i, lambda);
+    // out_w[i] = lognormal_cdf(i + 0.5, ln_location, ln_scale) - lognormal_cdf(i  - 0.5, ln_location, ln_scale);
+  //   out_w_vec[i] = lognormal_cdf(i + 0.5, ln_location, ln_scale) - lognormal_cdf(i  - 0.5, ln_location, ln_scale);
+  // }
   
-    // Calculate convolution of double delay and serial interval
-  out_wv[1] = 0.000001; // fix this?
-  for(s in 2:(t-1)){
-    out_wv[s] = 0;
-    for(j in 1:(s-1)){
-          out_wv[s] += out_w[j]*out_v[s-j];
-    }
-  }
-  
-  for(i in 1:(t-1)){
-    out_wv[i] = 0 ? 0.0000001 : out_wv[i];
-  }
-  
-  
-  out_i[1] = 0;
-  for (s in 2:t){
-    out_i[s] = 0;
-    for (i in 1:(s - 1)){
-      out_i[s] += (obs_imported[i] + obs_local[i]) * w[s - i];
-    }
-  }
-
-out_i2[1] = 0;
-  for (s in 2:t){
-    out_i2[s] = 0;
-    for (i in 1:(s - 1)){
-      out_i2[s] += (obs_imported[i] + obs_local[i]) * out_wv[s - i];
-    }
-  }
+  // for(j in 1:101) {
+  //   out_w[j] = w_dist(j - 50 , out_w_vec, t);
+  //   out_v[j] = conv_exp_pdf(j - 50, lambda);
+  // }
+  // Calculate convolution of serial interval and difference between two exponential delays
+  // for(i in 1:(t-1)) {
+  //   out_wv[i] = 0;
+  //   for(j in -50:50) {
+  //     out_wv[i] +=  w_dist(j, out_w_vec) * conv_exp_pdf(i-j, lambda);
+  //   }
+  // }
+//   
+//   out_i[1] = 0;
+//   for (s in 2:t){
+//     out_i[s] = 0;
+//     for (i in 1:(s - 1)){
+//       out_i[s] += (obs_imported[i] + obs_local[i]) * w[s - i];
+//     }
+//   }
+// 
+// out_i2[1] = 0;
+//   for (s in 2:t){
+//     out_i2[s] = 0;
+//     for (i in 1:(s - 1)){
+//       out_i2[s] += (obs_imported[i] + obs_local[i]) * out_wv[s - i];
+//     }
+//   }
 
 }
