@@ -51,13 +51,16 @@ model {
 
   // Mean = 2.6, sd = 2.6
   // R ~ lognormal(0.7231051, 0.6817717);
-  R ~ gamma(1, 5); // Prior used by EpiEstim
+  R ~ gamma(1, 0.2); // Prior used by EpiEstim
 
   phi ~ normal(0, 1) T[0,];
 }
 
 // spare code for checking serial interval distribution
-// generated quantities {
-//   real ran;
-//   ran = lognormal_rng(ln_location, ln_scale);
-// }
+generated quantities {
+  real w1[t-1];
+  
+  for (i in 1:t -1){
+    w1[i] = lognormal_cdf(i + 0.5, ln_location, ln_scale) - lognormal_cdf(i  - 0.5, ln_location, ln_scale);
+  }
+}
