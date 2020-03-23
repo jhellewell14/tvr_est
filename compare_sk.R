@@ -73,6 +73,10 @@ fit_p <- rstan::sampling(mod_p, data = dat,chains = 4,iter = 1000, cores = 4)
 res_p <- rstan::extract(fit_p)
 res <- rstan::extract(fit)
 
+# log_lik <- loo::extract_log_lik(fit, merge_chains = FALSE)
+# r_eff <- loo::relative_eff(exp(log_lik), cores = 4)
+# loo::loo(log_lik, r_eff = r_eff, cores = 4)
+# loo::waic(log_lik, r_eff = r_eff, cores = 6)
 
 st_df <- data.frame(med = apply(res$R, 2, median),
                     LQ = apply(res$R, 2, FUN = function(x){quantile(x, prob=0.025)}),
@@ -86,44 +90,14 @@ stp_df <- data.frame(med = apply(res_p$R, 2, median),
                     date = final_cases$dates,
                     model = "stan_pois")
 
-p1 <- rbind(rbind(ee_df,st_df),stp_df) %>%
-   dplyr::filter(date >= as.Date("2020-01-18")) %>%
- ggplot2::ggplot(ggplot2::aes(x=date,y=med)) +
- ggplot2::geom_line(ggplot2::aes(col = model)) +
- ggplot2::geom_ribbon(ggplot2::aes(fill = model, ymin = LQ, ymax = UQ),alpha=0.2) + 
- cowplot::theme_cowplot() +
- ggplot2::geom_hline(yintercept = 1, lty = 2) +
- ggplot2::ylab("Effective reproduction number") +
- ggplot2::xlab("Date") +
- ggplot2::scale_x_date(date_breaks = "1 week", date_labels = "%b %d")
+res_sk <- rbind(rbind(rbind(ee_df,st_df),stp_df),res_full)
+final_cases_sk <- final_cases
+si_sk <- data.frame(EpiEstim = ee_res$si_distr[1:61], 
+                    stan_pois = c(0,res_p$w2[1,]), 
+                    stan_nb = c(0,res$w1[1,]),
+                    t = 0:60)
 
-p2 <- ggplot2::ggplot(data = final_cases) +
- ggplot2::geom_bar(ggplot2::aes(x = dates, y = imported+local), stat = "identity") + 
- cowplot::theme_cowplot() +
- ggplot2::ylab("Cases") + 
- ggplot2::xlab("") +
- ggplot2::scale_x_date(date_breaks = "1 week", date_labels = "%b %d")
-
-
-p2 / p1
-
-p3 <- data.frame(EpiEstim = ee_res$si_distr[1:61], 
-                 stan_pois = c(0,res_p$w2[1,]), 
-                 stan_nb = c(0,res$w1[1,]),
-           t = 0:60) %>%
-   tidyr::gather(key = "model", value = "freq", -t) %>%
-   dplyr::filter(t < 20) %>%
-   ggplot2::ggplot(ggplot2::aes(x = t, y = freq, col = model)) +
-   ggplot2::geom_line() +
-   cowplot::theme_cowplot() +
-   ggplot2::xlab("Time") +
-   ggplot2::ylab("Frequency") +
-   ggplot2::scale_color_discrete(guide = "none")
- 
-p2 / p1 / p3 + patchwork::plot_layout(guides = "collect")
-
-plot(res_p$w1[1,])
-points(res_p$w2[1,],col = "green")
-points(ee_res$si_distr,col="red")
-points(EpiEstim::discr_si(1:60, mu = 4.7, sigma = 2.9),col = "blue")
+saveRDS(final_cases_sk, "final_cases_sk.rds")
+saveRDS(res_sk, "res_sk.rds")
+saveRDS(si_sk, "si_sk.rds")
 

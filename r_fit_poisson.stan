@@ -74,11 +74,5 @@ model {
 
 // spare code for checking serial interval distribution
 generated quantities {
-  real w1[t-1];
-  real w2[t-1];
-  // Discretise serial interval distribution
-  for (i in 1:(t-1)){
-    w1[i] = discr_si(i - 1, si_mean, si_sd);
-    w2[i] = gamma_cdf(i + 0.5, a, 1 / b) - gamma_cdf(i - 0.5, a, 1 / b);
-  }
+
 }

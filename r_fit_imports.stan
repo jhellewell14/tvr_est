@@ -10,20 +10,26 @@ data {
 transformed data{
   real infectiousness[t];
   real w[t - 1];
-  real ln_location;
-  real si_var;
-  real ln_scale;
+  // real ln_location;
+  // real si_var;
+  // real ln_scale;
+  real a;
+  real b;
   infectiousness[1] = 0;
-  
+
+  // calculate alpha and beta for gamma distribution
+  a = (si_mean / si_sd)^2;
+  b = (si_sd^2) / si_mean;
   
   // Calculate location and scale parameters for lognormal serial interval distribution
-  si_var = si_sd^2;
-  ln_location = log((si_mean^2) / sqrt(si_var + si_mean^2));
-  ln_scale = sqrt(log((si_var / (si_mean^2)) + 1));
+  // si_var = si_sd^2;
+  // ln_location = log((si_mean^2) / sqrt(si_var + si_mean^2));
+  // ln_scale = sqrt(log((si_var / (si_mean^2)) + 1));
 
   // Discretise serial interval distribution
   for (i in 1:t -1){
-    w[i] = lognormal_cdf(i + 0.5, ln_location, ln_scale) - lognormal_cdf(i  - 0.5, ln_location, ln_scale);
+    // w[i] = lognormal_cdf(i + 0.5, ln_location, ln_scale) - lognormal_cdf(i  - 0.5, ln_location, ln_scale);
+    w[i] = gamma_cdf(i + 0.5, a, 1 / b) - gamma_cdf(i - 0.5, a, 1 / b);
   }
 
   // Calculate infectiousness at each timestep
@@ -59,8 +65,18 @@ model {
 // spare code for checking serial interval distribution
 generated quantities {
   real w1[t-1];
+  real log_lik[t - (tau)];
   
   for (i in 1:t -1){
-    w1[i] = lognormal_cdf(i + 0.5, ln_location, ln_scale) - lognormal_cdf(i  - 0.5, ln_location, ln_scale);
+    // w1[i] = lognormal_cdf(i + 0.5, ln_location, ln_scale) - lognormal_cdf(i  - 0.5, ln_location, ln_scale);
+    w1[i] = gamma_cdf(i + 0.5, a, 1 / b) - gamma_cdf(i - 0.5, a, 1 / b);
+  }
+  
+  for (s in (tau + 1):t){
+    log_lik[s - tau] = 0;
+    for (i in (s-tau + 1):s){
+      log_lik[s - tau ] += neg_binomial_2_lpmf(obs_local[i] | R[s] * infectiousness[i], 1 / sqrt(phi));
+      // target += poisson_lpmf(obs_local[i] | R[s] * infectiousness[i]);
+    }
   }
 }

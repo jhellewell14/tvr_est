@@ -1,0 +1,65 @@
+---
+title: "Comparison of EpiEstim with stan model"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+source("plot_func.R")
+require(magrittr)
+require(ggplot2)
+require(dplyr)
+require(tidyr)
+require(patchwork)
+```
+
+### Introduction
+
+This report shows the output of our stan (<https://mc-stan.org/>) implementation of the EpiEstim model (<https://cran.r-project.org/web/packages/EpiEstim/index.html>) for estimating Time-Varying reproduction numbers during an ongoing epidemic. We aim to show that our stan model output is comparable to that of EpiEstim, to justify its use in our nowcasting analysis pipeline. The three models being compared are:
+
+- EpiEstim 
+- A stan implementation of EpiEstim
+- The stan model with a negative binomial likelihood instead of Poisson (allows for overdispersion in case numbers).
+
+### Data used for comparison
+
+We use data from the 2019-20 outbreaks in South Korea and China to verify that the output from our stan models matches that of EpiEstim. We fit the models to cases with known onset dates in each location, these cases represent a small proportion of all cases in the outbreak since most cases only have a confirmation date.
+
+### Model differences
+- The models differ in how they discretise the serial interval, EpiEstim uses an analytic estimate a discretised gamma distribution (<https://github.com/annecori/EpiEstim/blob/master/R/discr_si.R>) whereas the stan models use the cumulative distribution function of the gamma model to portion the probability density of the distribution into discrete values.
+
+### Model output comparison
+
+#### South Korea
+
+There are 80 cases with onset dates at the beginning of the outbreak in South Korea. The plot below shows the number of cases each day, the time-varying reproduction number estimated by each of the models, and the serial interval used in each model fit.
+
+```{r sk, echo = FALSE,fig.height = 9, fig.width = 6.5}
+res_sk <- readRDS("res_sk.rds")
+final_cases_sk <- readRDS("final_cases_sk.rds")
+si_sk <- readRDS("si_sk.rds")
+
+rt <- p1(res_sk,"2020-01-18")
+fc <- p2(final_cases_sk, "2020-01-18")
+si <- p3(si_sk)
+
+out <- fc / rt / si + patchwork::plot_layout(guides = "collect") & theme(axis.title = element_text(size=12))
+plot(out)
+```
+
+#### China
+
+There are 892 cases with onset dates at the beginning of the outbreak in China. The plot below shows the number of cases each day, the time-varying reproduction number estimated by each of the models, and the serial interval used in each model fit.
+
+```{r ch, echo = FALSE,fig.height = 9, fig.width = 6.5}
+res_ch <- readRDS("res_ch.rds")
+final_cases_ch <- readRDS("final_cases_ch.rds")
+si_ch <- readRDS("si_ch.rds")
+
+rt <- p1(res_ch, "2020-01-05")
+fc <- p2(final_cases_ch, "2020-01-05")
+si <- p3(si_ch)
+
+out <- fc / rt / si + patchwork::plot_layout(guides = "collect") & theme(axis.title = element_text(size=12))
+plot(out)
+```
